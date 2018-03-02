@@ -8,6 +8,7 @@
 // let io = socketIO(server);
 //
 // const port = process.env.PORT || 3000;
+
 const path = require('path');
 const http = require('http');
 const express = require('express');
@@ -19,28 +20,59 @@ const port = process.env.PORT || 3000;
 let app = express();
 let server = http.createServer(app);
 let io = socketIO(server);
+let mongoose = require('mongoose');
 
 app.use(express.static(publicPath));
+
+
+var uristring = 'mongodb://jestevez:jestevez@ds247078.mlab.com:47078/ruletasinruleta';
+mongoose.connect(uristring, function (err, res) {
+    if (err) {
+        console.log('ERROR connecting to: ' + uristring + '. ' + err);
+    } else {
+        console.log('Succeeded connected to: ' + uristring);
+    }
+});
+
+
+var userSchema = new mongoose.Schema({
+        tip: String,
+        table: String
+    }
+);
+
+
+var PUser = mongoose.model('Preguntas', userSchema);
+
+let gameContent;
+
+PUser.find({}, function (err, data) {
+    gameContent = data;
+    console.log(gameContent);
+
+});
+
 
 let numUser = 0;
 let nameUser = [];
 var roomno = 1;
 let game = [];
 var cont = 0;
-const gameContent = [
-    {
-        tip: "Dicho mañanero",
-        table: "A quien madruga dios le ayuda"
-    },
-    {
-        tip: "Comida valencia",
-        table: "Paella valenciana"
-    },
-    {
-        tip: "Nombre del abuelo de heidi",
-        table: "Herman Hessen"
-    }
-];
+// const gameContent = [
+//     {
+//         tip: "Dicho mañanero",
+//         table: "A quien madruga dios le ayuda"
+//     },
+//     {
+//         tip: "Comida valencia",
+//         table: "Paella valenciana"
+//     },
+//     {
+//         tip: "Nombre del abuelo de heidi",
+//         table: "Herman Hessen"
+//     }
+// ];
+
 
 server.listen(port, () => {
     console.log(`started on port: ${port}`);
@@ -51,6 +83,10 @@ io.on('connection', (socket) => {
     console.log('user connected');
 
     let roomNumber;
+
+    socket.on('login', loginData => {
+
+    }
 
     socket.on('new-user', (name) => {
         if (io.nsps['/'].adapter.rooms["room-" + roomno] && io.nsps['/'].adapter.rooms["room-" + roomno].length > 1) roomno++;
@@ -171,3 +207,46 @@ io.on('connection', (socket) => {
         io.to(roomNumber).emit('ragequit', game);
     });
 });
+
+const passport = require('passport');
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/success', (req, res) => res.send("You have successfully logged in"));
+app.get('/error', (req, res) => res.send("error logging in"));
+
+passport.serializeUser(function (user, cb) {
+    cb(null, user);
+});
+
+passport.deserializeUser(function (obj, cb) {
+    cb(null, obj);
+});
+
+/*  FACEBOOK AUTH  */
+
+const FacebookStrategy = require('passport-facebook').Strategy;
+
+const FACEBOOK_APP_ID = '417971778641741';
+const FACEBOOK_APP_SECRET = '72508ea8488e27ccba9070725b015597';
+
+passport.use(new FacebookStrategy({
+        clientID: FACEBOOK_APP_ID,
+        clientSecret: FACEBOOK_APP_SECRET,
+        callbackURL: "/auth/facebook/callback"
+    },
+    function (accessToken, refreshToken, profile, cb) {
+        return cb(null, profile);
+    }
+));
+
+app.get('/auth/facebook',
+    passport.authenticate('facebook'));
+
+app.get('/auth/facebook/callback',
+    passport.authenticate('facebook', {failureRedirect: '/error'}),
+    function (req, res) {
+        console.log(req.user);
+        res.redirect('/success');
+    });
+
