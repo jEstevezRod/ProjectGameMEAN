@@ -1,23 +1,20 @@
-// let express = require('express')
-// let app = express();
-//
-// let http = require('http');
-// let server = http.Server(app);
-//
-// let socketIO = require('socket.io');
-// let io = socketIO(server);
-//
-// const port = process.env.PORT || 3000;
-
 const path = require('path');
 const http = require('http');
 const express = require('express');
 const socketIO = require('socket.io');
+const bodyParser = require('body-parser');
+
+var jwt = require('jwt-simple');
+var secret = 'salami';
+
+let app = express();
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
 
 const publicPath = path.join(__dirname, 'public');
 const port = process.env.PORT || 3000;
-let app = express();
 let server = http.createServer(app);
 let io = socketIO(server);
 let mongoose = require('mongoose');
@@ -35,18 +32,24 @@ mongoose.connect(uristring, function (err, res) {
 });
 
 
-var userSchema = new mongoose.Schema({
-        tip: String,
-        table: String
-    }
+let questionSchema = new mongoose.Schema({
+    tip: String,
+    table: String
+}
 );
+let playerSchema = new mongoose.Schema({
+    user: String,
+    pass: String
+})
 
+let Questions = mongoose.model('Preguntas', questionSchema);
 
-var PUser = mongoose.model('Preguntas', userSchema);
+let Players = mongoose.model('jugadores', playerSchema);
+
 
 let gameContent;
 
-PUser.find({}, function (err, data) {
+Questions.find({}, function (err, data) {
     gameContent = data;
     console.log(gameContent);
 
@@ -58,20 +61,7 @@ let nameUser = [];
 var roomno = 1;
 let game = [];
 var cont = 0;
-// const gameContent = [
-//     {
-//         tip: "Dicho mañanero",
-//         table: "A quien madruga dios le ayuda"
-//     },
-//     {
-//         tip: "Comida valencia",
-//         table: "Paella valenciana"
-//     },
-//     {
-//         tip: "Nombre del abuelo de heidi",
-//         table: "Herman Hessen"
-//     }
-// ];
+
 
 
 server.listen(port, () => {
@@ -79,13 +69,35 @@ server.listen(port, () => {
 });
 
 
+
+
+
+
 io.on('connection', (socket) => {
     console.log('user connected');
 
     let roomNumber;
-
-    socket.on('login', loginData => {
-
+    app.post("/nickname", auth, (req, res) => {
+        console.log("estoy haciendo el post en el servidor")
+        const payload = { user: req.body.user, pass: req.body.pass };
+        let miToken = jwt.encode(payload, secret);
+        res.status(200).json({ token: miToken });
+    })
+    
+    function auth(req, res, next) {
+        console.log("lo qye he mandado" + req.body.name + req.body.pass);
+        var playernew;
+        Players.find({ "nombre": req.body.name, "pass": req.body.pass }, function (error, data) {
+            if (data != "") {
+                if (req.body.pass == data[0].pass) {
+                    next(); // Te autentifico
+                } else {
+                    res.status(401).send({ success: false, msg: 'No puedes acceder sin estar registrado' }); // No te autentifico
+                }
+            } else {
+                res.status(401).send({ success: false, msg: 'No puedes acceder sin estar registrado' }); // No te autentifico
+            }
+        })
     }
 
     socket.on('new-user', (name) => {
@@ -231,10 +243,10 @@ const FACEBOOK_APP_ID = '417971778641741';
 const FACEBOOK_APP_SECRET = '72508ea8488e27ccba9070725b015597';
 
 passport.use(new FacebookStrategy({
-        clientID: FACEBOOK_APP_ID,
-        clientSecret: FACEBOOK_APP_SECRET,
-        callbackURL: "/auth/facebook/callback"
-    },
+    clientID: FACEBOOK_APP_ID,
+    clientSecret: FACEBOOK_APP_SECRET,
+    callbackURL: "/auth/facebook/callback"
+},
     function (accessToken, refreshToken, profile, cb) {
         return cb(null, profile);
     }
@@ -244,7 +256,7 @@ app.get('/auth/facebook',
     passport.authenticate('facebook'));
 
 app.get('/auth/facebook/callback',
-    passport.authenticate('facebook', {failureRedirect: '/error'}),
+    passport.authenticate('facebook', { failureRedirect: '/error' }),
     function (req, res) {
         console.log(req.user);
         res.redirect('/success');

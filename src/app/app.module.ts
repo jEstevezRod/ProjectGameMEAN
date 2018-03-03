@@ -3,6 +3,8 @@ import {NgModule} from '@angular/core';
 import {SocketService} from "./socket.service";
 import {FormsModule} from "@angular/forms";
 import {RouterModule} from "@angular/router";
+import {HttpClientModule} from "@angular/common/http";
+
 
 
 import {AppComponent} from './app.component';
@@ -39,7 +41,8 @@ const routes = [
     imports: [
         BrowserModule,
         FormsModule,
-        RouterModule.forRoot(routes)
+        RouterModule.forRoot(routes),
+        HttpClientModule
     ],
     providers: [SocketService, CommunicationService],
     bootstrap: [AppComponent]
